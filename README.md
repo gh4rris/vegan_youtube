@@ -81,10 +81,36 @@ Looking at the regression line of the top three coefficients we can see that sub
 
 ### Random forest [04_modeling_dt_rf.ipynb](/04_modeling_dt_rf.ipynb)
 
-Using a partial dependence plot we can see that keeping all other features constant, there is a strong positive trend between subscriber count and view count. This trend is gradual at first, but seems to shoot off around 20k+ subscribers. The trend starts to slow down again around 160k subscribers. There is also a positive trend for channel total view count, although much weaker. In fact there is a large interval between about 440k and 65.6 million channel views, where this feature doesn't fluctuate in its importance for predicting video views. For total video count of the channel, suprisingly there is a negative trend. The plot shows a mostly consistent trend downwards, meaning that with all other features held equal, the more videos a channel has, the fewer views it is predicted to have.
+Using a partial dependence plot we can see that keeping all other features constant, there is a strong positive trend between subscriber count and view count. This trend is gradual at first, but seems to shoot off around 20k+ subscribers. The trend starts to slow down again around 160k subscribers. There is also a positive trend for channel total view count, although much weaker. In fact there is a large interval between about 440k and 65.6 million channel views, where this feature doesn't fluctuate in its influance for predicting video views. For total video count of the channel, suprisingly there is a negative trend. The plot shows a mostly consistent trend downwards, meaning that with all other features held equal, the more videos a channel has, the fewer views it is predicted to have.
 
 ![pdp1](/images/pdp_sub_video_channel_view_count.png)
 
-Looking at the duration, there is a general positive trend to views, however there is a large dip around 53 seconds, that starts to increase again around 1.5 mins. This is probably where there are still some Youtube shorts still included in the data. After this the trend is positive until about 40.5 mins when the association starts to dip again. Description length initially has a negative association with view count up to about 125 characters all the way up to about 1300 characters. Higher tag counts also appar to be associated with more views, with 18 tags being the peak, it starts to dip down a little again after that.
+Looking at the duration, there is a non-linear relationship between views, the general trend is positive, however there is a large dip around 53 seconds that starts to increase again around 1.5 mins. This is probably where there are still some Youtube shorts still included in the data. After this the trend is positive until about 40.5 mins when the influence starts to dip again. Description length initially has a negative influence on view count up to about 125 characters all the way up to about 1300 characters. Higher tag counts also appar to be associated with more views, with 18 tags being the peak, it starts to dip down a little again after that.
 
 ![pdp2](/images/pdp_duration_desc_length_tag_count.png)
+
+Publishing a video between 12 and 1am there is a clear stronger influence on view count than any other time of day. As for day of the week, there is a dip in influence on Monday and Tuesday, but all other days are equal. Finally all months of the year appear to be equal, with the exception of January which is the weakest.
+
+![pdp3](/images/pdp_hour_month_weekday_pub.png)
+
+The beeswarm shows the shap values of the most important terms used in the video titles and descriptions. Most notably the term "outreach" has a strong negative impact on view count. This could be because outreach videos are more of a niche activism focused genre, it could also be correlated with other features that are having a negative impact. The term "music" has a positive impact.
+
+![Term beeswarm](/images/term_beeswarm.png)
+
+While most categories in the dataset have little to no impact on view count, the strongest negative impact is Science & Technology, and the strongest positive is Music, which is consistent with what we saw on the term beeswarm. Categories such as People & Blogs, Howto & Style and Education all had some positive impact as well.
+
+![Category beeswarm](/images/category_beeswarm.png)
+
+## Further investigation [05_investigation_shap.ipynb](/05_investigation_shap.ipynb)
+
+### Outreach
+
+Since containing the term "outreach" had a negative global impact in the beeswarm, I decided to look at the local impact of the highest viewed outreach videos using waterfall plots. Looking at these we can see they are all getting most of their negative impact from subscriber count, and sometimes channel view count. Channel video count is the main positive impact on views for these videos, which as we saw from the pdp earlier video count has a negative global influence, suggesting that channels that upload outreach videos generally have fewer videos on average.
+
+From this we can see that although there is some small negative signal from containing the term "outreach", for the most part they aren't being inherently penalized, but rather are coming from smaller, less established channels with less subscribers and channel views. Possible recommendations: A/B test alternative titles that omit the word "outreach" entirely to see if there's any effect on view count, or mix outreach with broader categories, or do collabs to build subscribers.
+
+- [Vegan Outreach 485](/images/local_shap/vegan_outreach_485.png)
+- [James Kite 671](/images/local_shap/james_kite_671.png)
+- [James Kite 464](/images/local_shap/james_kite_464.png)
+- [Clif Grant 380](/images/local_shap/clif_grant_380.png)
+- [The Cranky Vegan](/images/local_shap/the_cranky_vegan_683.png)
