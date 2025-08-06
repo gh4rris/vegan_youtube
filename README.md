@@ -2,17 +2,17 @@
 
 ### Predicting Youtube engagement for vegan and animal rights based content
 
-This supervised learning project explores what makes vegan and animal rights based Youtube content successful in terms of engagement. Using the official Youtube API, machine learning models, and model interpretability tools, I investigate which features are associated with view count and what their relationship is.
+This supervised learning project explores what makes vegan and animal rights based Youtube content successful in terms of engagement. Using the official Youtube API, machine learning models, and model interpretability tools, I investigate which features are associated with view rate (view count / number of days published) and what their relationship is.
 
 The population of videos being analysed is videos with an animal rights based message and or made with the intent to encourage others to live vegan (the ethical principal that animals are entitled to rights). This can include cooking, lifestyle and health videos made with that intent. It can also include videos from non-vegan channels such as speeches, interviews, debates, so long as there is someone in these videos arguing for the ethical principal of veganism. It would not however include videos of someone attempting a vegan diet for a period of time, even if the experience is spoken about positively and they encourage others to try it.
 
-The goal of this project is to gain insights into what features are associated with higher view counts, so as to make recomendations to vegan content creators to optimize their reach.
+The goal of this project is to gain insights into what features are associated with higher view rates, so as to make recomendations to vegan content creators to optimize their reach.
 
 ## Objectives
 
 - Scrape Youtube metadata using official API
 - Prepare data for modeling
-- Model to predict view count using R2 and RMSE as metrics
+- Model to predict view rate using R2 and RMSE as metrics
 - Interpret model behaviour using SHAP and Partial Dependancy Plots
 - Identify actionable insights for content creators
 
@@ -23,13 +23,13 @@ The goal of this project is to gain insights into what features are associated w
 - **API:** Youtbe Data API v3
 - **IDE:** Jupiter notebook (VS code)
 
-## Data collection [01_scraping.ipynb](/01_scraping.ipynb)
+## Data Collection [01_scraping.ipynb](/01_scraping.ipynb)
 
 The Youtube client object was built using the official Google python client library found [here](https://github.com/googleapis/google-api-python-client). An API key was then generated using a google account, and set as an environment variable. A video search was then done for key search terms such as "animal liberation" and "vegan speech", also for key animal rights content creators such as "joey carbstrong" and "earthling ed". Each search returned the video IDs for the first 100 results. The list of IDs was de-duplicated, and data on each individual video was collected, including the channel ID. As category returns an ID rather than the name, an additional search was used to collect the names. Finally the channel ID collected earlier was used to collect additional channel info for each video, such as subscribber and video count. All data was saved into the [/data](/data/) directory as [videos_unprepared.csv](/data/videos_unprepared.csv).
 
-## Feature engineering [02_cleaning.ipynb](/02_cleaning.ipynb)
+## Feature Engineering & Exploratory Data Analysis [02_wrangling_eda.ipynb](/02_wrangling_eda.ipynb)
 
-I first extracted the hour, weekday and month of the year the video was published from the date. Next, as the category and channel data were in seperate csv files, I imported them and merged everything into one dataframe. The duration was initially in a string format e.g. "PT1H32M15S" for 1 hour, 32 mins and 15 seconds. I converted this into total seconds for a consistent numarical value. Binary variables Were turned into 1s and 0s, for definition 0 = sd & 1 = hd, and for caption 0 = False, 1 = True. I removed videos with the hastag #shorts in the title and also filtered out any channel names that had videos in the data that weren't representative of the target population e.g. they were talking about veganism but not promoting animal rights. Next I one-hot encoded the categories, dropping the dedundant first column which was "Autos & Vehicles". This gave me a feature column for every category with 0 for False and 1 for True.
+I first extracted the hour, weekday and month of the year the video was published from the date, as well as how many days the video had been published for. Next, as the category and channel data were in seperate csv files, I imported them and merged everything into one dataframe. The duration was initially in a string format e.g. "PT1H32M15S" for 1 hour, 32 mins and 15 seconds. I converted this into total seconds for a consistent numarical value, then videos under 180 seconds (3mins) were assigned an _is_short_ binary variable for Youtube shorts. _definition_ and _caption_ were also converted to binary, for definition 0 = sd & 1 = hd, and for caption 0 = False, 1 = True. I filtered out any channel names that had videos in the data that weren't representative of the target population e.g. they were talking about veganism negatively or not at all, then further filtered out unwanted subjects from the remaining channels. The target variable _view_rate_ was then calculated by dividing _view_count_ by _published_duration_days_.
 
 For tags, as there were almost 5000 unique ones, I just created features for the top 11 and also a seperate one for total tag count.
 
@@ -41,17 +41,29 @@ Checking numerical variable distributions, it can be seen that there is a strong
 
 ![Variable distributions](/images/variable_distributions.png)
 
-Then applying a log transformation to these variables, and a cube root transformation to the description length as its skew is less extreeme. This is to normalize the data so that variables with larger scales don't dominate the results:
+Then applying a log transformation to these variables, a cube root transformation to the _published_duration_days_ and _description_length_ as its skew is less extreme, and a box cox transformation to _view_rate_ as it's skew is the most extreme. This is to normalize the data so that variables with larger scales don't dominate the results:
 
 ![Transformed distributions](/images/transformed_variable_distributions.png)
+
+Then looked at the _view_rate_ distributions for the top 5 categories:
+
+![Category distributions](/images/category_distributions.png)
+
+Science & Technology videos have the highest median view rate, as well as the least amount of variance suggesting that these types of videos are safe in terms of performing well, but don't have the same potential to go viral as People & Blogs or Nonprofits & Activism. However, these two categories have high variability, and carry the risk of performing much worse. Entertainment and Science & Technology both show some outliers, investigating these shows videos that are all representative of the population but went viral or overperformed, so they were kept in. The categories were then one-hot encoded, which gave me a feature column for every category with 0 for False and 1 for True.
+
+The numerical features were then formatted into a heatmap to compare correlations:
+
+![Numerical heatmap](/images/numerical_heatmap.png)
+
+Unsuprisingly the view rates strongest positive correlations are with channel subscriber and channel view count. It also has a somewhat negative correlation with the number of days the video has been published for, which makes sense as the rate of views will eventually decline over time.
 
 The prepared data was finally saved into the [/data](/data/) directory as [videos_prepared.csv](/data/videos_prepared.csv).
 
 ## Modeling
 
-The target variable I am modelling to predict is the log transformed view count _log_view_count_. This means the predictions will need to be scaled back to to get in number of views. The first approach to this was to try and find a linear relationship between the features and the target. I standardized the data, as as some of the features have different ranges, and then applied a lasso regression for feature selection, to find what the most relevant features were for predicting view count. I tried multiple alpha values and looped through them to get the highest R2 and lowest root mean squared error (RMSE). Using the optimal alpha value of 0.1, the features were reduced from 337 to 25. A linear model was fitted to the training data for just these features and then on the test data using these features the R2 was about 0.53 and RMSE about 1.81 (log).
+The target variable I am modelling to predict is the box cox transformed view rate _box_view_rate_. This means the predictions will need to be scaled back to to get in number of views. The first approach to this was to try and find a linear relationship between the features and the target. I standardized the data, as as some of the features have different ranges, and then applied a lasso regression for feature selection, to find what the most relevant features were for predicting view rate. I tried multiple alpha values and looped through them to get the highest R2 and lowest root mean squared error (RMSE). Using the optimal alpha value of 0.001, the features were reduced from 337 to 154. A linear model was fitted to the training data for just these features and then on the test data using these features the R2 was about 0.63 and RMSE about 1.97 (box cox).
 
-Looking at the models top coefficients, subscriber count has the strongest association in explaining the variance in view count, followed by the channels total view count and then whether or not is of the Music category. All of the top features appear to have a positive correlation with the target, with the exception of the term "surge" which is negative:
+Looking at the models top coefficients, channel view count has the strongest association in explaining the variance in view count, followed by the term "sub" and then the term "joeycarbstrong". Most of the top features appear to have a positive correlation with the target, with the exception of the terms "therammsden", "glory" and "facebook" which are negative:
 
 ![Linreg features](/images/linreg_top_features.png)
 
@@ -113,4 +125,11 @@ From this we can see that although there is some small negative signal from cont
 - [James Kite 671](/images/local_shap/james_kite_671.png)
 - [James Kite 464](/images/local_shap/james_kite_464.png)
 - [Clif Grant 380](/images/local_shap/clif_grant_380.png)
-- [The Cranky Vegan](/images/local_shap/the_cranky_vegan_683.png)
+- [The Cranky Vegan 683](/images/local_shap/the_cranky_vegan_683.png)
+
+### Music
+
+There were only two videos in the test data that were of the Music category, both with low view counts, and both of which were overpredicted by the model. Looking at the waterfall plots we can see that while being in the Music category does have some positive signal, it is outweighed by the low subscriber count. This is probably why the regression line for Music is flat, because while it does have a positive impact, less established channels with fewer subscribers will still get fewer views.
+
+- [The Green Note 647](/images/local_shap/the_green_note_647.png)
+- [禅 207](/images/local_shap/禅_207.png)
