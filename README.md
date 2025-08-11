@@ -16,12 +16,26 @@ The goal of this project is to gain insights into what features are associated w
 - Interpret model behaviour using SHAP and Partial Dependancy Plots
 - Identify actionable insights for content creators
 
-## Tools & technlogies
+## Tools & Technlogies
 
 - **Language:** Python
-- **Libraries:** pandas, numpy, matplotlib, seaborn, scikit-learn, shap, googleapiclient, os, re, ast
-- **API:** Youtbe Data API v3
+- **Libraries:** pandas, numpy, matplotlib, seaborn, scikit-learn, scipy, xgboost, shap, googleapiclient, pickle, datetime, zoneinfo, os, re, ast
+- **API:** Youtube Data API v3
 - **IDE:** Jupiter notebook (VS code)
+
+## Modeling Aproach
+
+- **Target variable:** Box cox transformed view rate (view count / number of days published)
+- **Models used:** Linear regression (with lasso for feature selection), decision tree, random forest & xgboost
+- **Loss function:** MSE
+- **Evaluation metrics:** RMSE, MedAE & Residual analysis (in back transformed view rate units)
+
+## Summary Results
+
+- **Linear regression:** RMSE: 484.06 (95% CI=362.92, 598.35), MedAE: 18.52 (95% CI=14.5, 23.97)
+- **Decision tree:** RMSE: 548.46 (95% CI=352.47, 717.42), MedAE: 16.67 (95% CI=11.72, 24.9)
+- **Random forest:** RMSE: 518.92 (95% CI=326.41, 684.91), MedAE: 13.66 (95% CI=10.44, 15.51)
+- **XGBoost:** RMSE: 519.54 (95% CI=329.84, 683.8), MedAE: 12.22 (95% CI=9.3, 15.4)
 
 ## Data Collection [01_scraping.ipynb](/01_scraping.ipynb)
 
@@ -59,21 +73,17 @@ Unsuprisingly the view rates strongest positive correlations are with channel su
 
 The prepared data was finally saved into the [/data](/data/) directory as [videos_prepared.csv](/data/videos_prepared.csv).
 
-## Modeling
+## Model Training & Evaluation [03_modeling_linreg.ipynb](/03_modeling_linreg.ipynb), [04_modeling_dt_rf.ipynb](/04_modeling_dt_rf.ipynb)
 
-The target variable I am modelling to predict is the box cox transformed view rate _box_view_rate_. This means the predictions will need to be scaled back to to get in number of views. The first approach to this was to try and find a linear relationship between the features and the target. I standardized the data, as some of the features have different ranges, and then applied a lasso regression for feature selection, to find what the most relevant features were for predicting view rate. I tried multiple alpha values and looped through them to get the highest R2 and lowest root mean squared error (RMSE). Using the optimal alpha value of 0.001, the features were reduced from 337 to 154. A linear model was fitted to the training data for just these features and then on the test data using these features the R2 was 0.63 and RMSE 621.66 (once back transformed). Although the RMSE is quite high, the MedAE is only 20.41 suggesting the model is accurate most of the time, but there are some large misses that skew the residuals.
+The target variable I am modelling to predict is the box cox transformed view rate _box_view_rate_. This means the predictions will need to be scaled back to to get in number of views. The first approach to this was to try and find a linear relationship between the features and the target. I standardized the data, as some of the features have different ranges, and then applied a lasso regression for feature selection, to find what the most relevant features were for predicting view rate. I tried multiple alpha values and looped through them to get the smalles RMSE. Using the optimal alpha value of 0.01, the features were reduced from 337 to 115. A linear model was fitted to the training data for just these features, and then on the test data using these features the RMSE was 484.06 (once back transformed). Although the RMSE is quite high, the median absolute error (MedAE) is only 18.52 suggesting the model is accurate most of the time, but there are some large misses that skew the residuals.
 
-Looking at the models top coefficients, channel view count has the strongest association in explaining the variance in view count, followed by the term "sub" and then the term "joeycarbstrong". Most of the top features appear to have a positive correlation with the target, with the exception of the terms "therammsden", "glory" and "facebook" which are negative:
-
-![Linreg features](/images/linreg_top_features.png)
-
-The residuals for the predictions were then plotted. Looking at this, we can see that at the low prediction levels up to box 0, the model tended to under predict more often and to a greater degree than it did over predict. Over box 0 the variance of residuals seems pretty even with no clear patterns.
+The residuals for the predictions were then plotted. Looking at this, we can see that the bulk of the models predictions were below 300 view rate, and that these tended to be reletively accurate, however there were some outliers it tended to underpredict. When the model made predictions between 400 and 1000, it would overpredict. There is one extreme outlier that the model underpredicted by over 4000, when predicted 1600.
 
 ![Linreg residuals](/images/linreg_residual_plot.png)
 
-This tendency to under predict at the lower end suggests a more flexible model may be appropriate, so next I tried a decision tree. For this I used hyperparameter tuning to find the optimal parameters, and fitted a model with these to the training data. The R2 for the decision tree on the test data was 0.62, and RMSE was 770.50. A bit of a downgrade, so I tried to improve using a random forest. This time for hyperparameter tuning I used RandomSearchCV to search a wide range of randomly selected parameters, and then using the best parameter results, used GridSearchCV to fine-tune a narrower range. Once I fit the random forest with the optimal parameters and scored it against the test data, the R2 was 0.79 and RMSE 1.38, a big improvement from the original linear model.
+This pattern of change in residual variance at different residual levels suggests a more flexible model may be appropriate, so next I tried a decision tree. For this I used hyperparameter tuning to find the optimal parameters, and fitted a model with these to the training data. The RMSE for the decision tree on the test data was 0.66, and RMSE was 552.01. A bit of a downgrade, so I tried to improve using a random forest. This time for hyperparameter tuning I used RandomSearchCV to search a wide range of randomly selected parameters, and then using the best parameter results, used GridSearchCV to fine-tune a narrower range. Once I fit the random forest with the optimal parameters and scored it against the test data, the R2 was 0.78 (95% CI=0.75, 0.81) and RMSE 516.11 (95% CI=322.56, 682.14). Whilst the random forest is better explaining the variance in view rate than the linear regression, the RMSE has actually increased. Since the MedAE has now decreased to 12.96, this suggests an improved accuracy for smaller view rates, however large misses have grown even larger, skewing the residuals further.
 
-There doesn't appear to be any clear pattern for the residuals of the random forest, indicating the model is well-fitted.
+This is confirmed looking at the residual plot. It is one residual in particular over 5000 heavily skewing the distribution causing the increased RMSE.
 
 ![RandForest residuals](/images/rf_residual_plot.png)
 
@@ -81,21 +91,23 @@ The top features for the random forest subscribber, channel video & channel view
 
 ![Randforest features](/images/rf_top_feature_importance.png)
 
-## Interpretation
+## Interpretation [05_interpretation](/05_interpretation.ipynb)
 
-### Linear regression [03_modeling_linreg.ipynb](/03_modeling_linreg.ipynb)
+### Linear regression
 
-When sorted by log_channel_sub_count the top coefficient we can see 'TEDx Talks' is the most subscribed to channel and that there are 5 videos all with high views, the most popular being 'Every Argument Against Veganism' by Ed Winters with a view count when scaled back of over 2.34 million. Other high subscriber, high videos included another 'TEDx Talks' by Moby, A 'Big Think' video with Peter Singer, two 'Brut India' videos with Joaquin Phoenix, and an 'Oxford Union' video with Joey Carbstrong. This suggets a pattern of high subscriber non-vegan channels having big name people, whether known for veganism or other things, on their channel for speeches/talks/interviews is a good indicater of higher view count. When sorting by log_channel_view_count we get a lot of the same videos including 'TEDx Talks', 'Big Think' & 'Brut India' suggesting subscribers and channel views are strongly correlated. Sorting by Music category, we can see there some high view songs, which is why the model determined that important. The highest being 'ALO (Animal Liberation Orchestra) - Girl, I Wanna Lay You Down ft. Jack Johnson' with over 501k views.
+Looking at the models top coefficients, channel view count has the strongest association in explaining the variance in video view rate, followed by the subscriber count and then the term "vegangains". Most of the top features appear to have a positive correlation with the target, with the exception of the duration and the terms "davidractivism" and "join" which are negative:
 
-Looking at the regression line of the top three coefficients we can see that subscribber and channel view count both have a strong correlation with video view count. Music category on the other hand, despite being the third strongest coefficient has a flat regression line. This may be because there are other features that music videos tend to be correlated with that have a negative impact on view count.
+![Linreg features](/images/linreg_top_features.png)
 
-![Linreg coef reg lines](/images/top_coefficient_regression_lines.png)
+When sorted by highest channel view count or subscriber count with the largest view rates, we can see they share a lot of the same videos. Such as 5x "TEDx Talks", 2x "Brut India" videos and a "Big Think" video. This is likely due to the fact these two variables are highly correlated as we saw in the heat map. It is also worth noting that a lot of these videos are on non vegan related channels, but contain big names, whether known for veganism, or other things e.g. Ed Winters, Moby, Joaquin Phoenix, Joey Carbstrong and Peter Singer.
 
-### Random forest [04_modeling_dt_rf.ipynb](/04_modeling_dt_rf.ipynb)
+The third largest coefficient is the term "vegangains". Looking at the highest view rate videos that contain this term are a combination of fittness videos and debates. The noteable standout is the highest rated video by the channel "Turkey Tom", a documentary featuring and interviewing the youtuber.
 
-Using a partial dependence plot we can see that keeping all other features constant, there is a strong positive trend between subscriber count and view count. This trend is gradual at first, but seems to shoot off around 20k+ subscribers. The trend starts to slow down again around 160k subscribers. There is also a positive trend for channel total view count, although much weaker. In fact there is a large interval between about 440k and 65.6 million channel views, where this feature doesn't fluctuate in its influance for predicting video views. For total video count of the channel, suprisingly there is a negative trend. The plot shows a mostly consistent trend downwards, meaning that with all other features held equal, the more videos a channel has, the fewer views it is predicted to have.
+### Random forest
 
-![pdp1](/images/pdp_sub_video_channel_view_count.png)
+Using a partial dependence plot we can see that the average predicted view rate for a video with under 20 thousand subscribers is 2. There is an upward trend from this point and by 160 thousand subscribers predictions are averaging 78 per day with all other features held constant. The channel view count is relatively flat, as it is highly correlated with subscriber count and the model is relying on this more. As number of videos uploaded to a chnnel increase, there is a downward trend in view rate. Rates fall from about 30 at 20 videos to 15 at 1000 videos.
+
+![RF pdp channel stats](/images/rf_pdp_channel_stats.png)
 
 Looking at the duration, there is a non-linear relationship between views, the general trend is positive, however there is a large dip around 53 seconds that starts to increase again around 1.5 mins. This is probably where there are still some Youtube shorts still included in the data. After this the trend is positive until about 40.5 mins when the influence starts to dip again. Description length initially has a negative influence on view count up to about 125 characters all the way up to about 1300 characters. Higher tag counts also appar to be associated with more views, with 18 tags being the peak, it starts to dip down a little again after that.
 
