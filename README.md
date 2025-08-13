@@ -81,15 +81,17 @@ The residuals for the predictions were then plotted. Looking at this, we can see
 
 ![Linreg residuals](/images/linreg_residual_plot.png)
 
-This pattern of change in residual variance at different residual levels suggests a more flexible model may be appropriate, so next I tried a decision tree. For this I used hyperparameter tuning to find the optimal parameters, and fitted a model with these to the training data. The RMSE for the decision tree on the test data was 0.66, and RMSE was 552.01. A bit of a downgrade, so I tried to improve using a random forest. This time for hyperparameter tuning I used RandomSearchCV to search a wide range of randomly selected parameters, and then using the best parameter results, used GridSearchCV to fine-tune a narrower range. Once I fit the random forest with the optimal parameters and scored it against the test data, the R2 was 0.78 (95% CI=0.75, 0.81) and RMSE 516.11 (95% CI=322.56, 682.14). Whilst the random forest is better explaining the variance in view rate than the linear regression, the RMSE has actually increased. Since the MedAE has now decreased to 12.96, this suggests an improved accuracy for smaller view rates, however large misses have grown even larger, skewing the residuals further.
+This pattern of change in residual variance at different residual levels suggests a more flexible model may be appropriate, so next I tried a decision tree. For this I used hyperparameter tuning to find the optimal parameters, and fitted a model with these to the training data. The RMSE for the decision tree on the test data was 548.46. A bit of a downgrade, so I tried to improve using a random forest. This time for hyperparameter tuning I used RandomSearchCV to search a wide range of randomly selected parameters, and then using the best parameter results, used GridSearchCV to fine-tune a narrower range. Once I fit the random forest with the optimal parameters and scored it against the test data, the RMSE was 518.92 (95% CI=326.41, 684.91). This is still larger than the linear regression, however the MedAE has now decreased to 13.66 (95% CI=10.44, 15.51). This suggests an improved accuracy for smaller view rates, although large misses have grown, skewing the residuals further.
 
 This is confirmed looking at the residual plot. It is one residual in particular over 5000 heavily skewing the distribution causing the increased RMSE.
 
 ![RandForest residuals](/images/rf_residual_plot.png)
 
-The top features for the random forest subscribber, channel video & channel view count:
+The same hyperparameter tuning method was applied to xgboost acheiving an RMSE of 519.54 (95% CI=329.84, 683.8) and a MedAE of 12.22 (95% CI=9.3, 15.4). Roughly the same results as the random forest.
 
-![Randforest features](/images/rf_top_feature_importance.png)
+The residual plot for the xgboost is similar to the random forest. Where the random forest made a few more predictions over 800, the xgboost was more conservative:
+
+![XGBoost residuals](/images/xgb_residual_plot.png)
 
 ## Interpretation [05_interpretation](/05_interpretation.ipynb)
 
@@ -105,25 +107,51 @@ The third largest coefficient is the term "vegangains". Looking at the highest v
 
 ### Random forest
 
+The top features for the random forest were subscribers, days published & channel view count:
+
+![Randforest features](/images/rf_top_feature_importance.png)
+
 Using a partial dependence plot we can see that the average predicted view rate for a video with under 20 thousand subscribers is 2. There is an upward trend from this point and by 160 thousand subscribers predictions are averaging 78 per day with all other features held constant. The channel view count is relatively flat, as it is highly correlated with subscriber count and the model is relying on this more. As number of videos uploaded to a chnnel increase, there is a downward trend in view rate. Rates fall from about 30 at 20 videos to 15 at 1000 videos.
 
 ![RF pdp channel stats](/images/rf_pdp_channel_stats.png)
 
-Looking at the duration, there is a non-linear relationship between views, the general trend is positive, however there is a large dip around 53 seconds that starts to increase again around 1.5 mins. This is probably where there are still some Youtube shorts still included in the data. After this the trend is positive until about 40.5 mins when the influence starts to dip again. Description length initially has a negative influence on view count up to about 125 characters all the way up to about 1300 characters. Higher tag counts also appar to be associated with more views, with 18 tags being the peak, it starts to dip down a little again after that.
+Differences in time of upload are very small, although there seems to be a pattern of more activity between 12 and 6pm. And at the bginning of the week (Monday & Tuesday).
 
-![pdp2](/images/pdp_duration_desc_length_tag_count.png)
+![RF pdp time stats](/images/rf_pdp_time_stats.png)
 
-Publishing a video between 12 and 1am there is a clear stronger influence on view count than any other time of day. As for day of the week, there is a dip in influence on Monday and Tuesday, but all other days are equal. Finally all months of the year appear to be equal, with the exception of January which is the weakest.
+Video duration, title length, description length, tag count and whether or not the video is a short all seem to have very little effect on the models prediction. However, how long the video has been published shows a clear downward trend in predictions. This makes sense, as videos that have been published for longer are likely to decline in popularity over time. Videos published for 60 days average at about 60 view rate, videos published for 500 days at about 20, and videos published for 2000 days at about 6.
 
-![pdp3](/images/pdp_hour_month_weekday_pub.png)
+![RF pdp misc variables](/images/rf_pdp_misc_variables.png)
 
-The beeswarm shows the shap values of the most important terms used in the video titles and descriptions. Most notably the term "outreach" has a strong negative impact on view count. This could be because outreach videos are more of a niche activism focused genre, it could also be correlated with other features that are having a negative impact. The term "music" has a positive impact.
+The beeswarm shows the shap values of the most important terms used in the video titles and descriptions. Most notably the term "outreach" has a strong negative impact on view count. This could be because outreach videos are more of a niche activism focused genre, it could also be correlated with other features that are having a negative impact. The terms "instagram" and "gains" have a strong positive impact.
 
-![Term beeswarm](/images/term_beeswarm.png)
+![RF term beeswarm](/images/rf_term_beeswarm.png)
 
-While most categories in the dataset have little to no impact on view count, the strongest negative impact is Science & Technology, and the strongest positive is Music, which is consistent with what we saw on the term beeswarm. Categories such as People & Blogs, Howto & Style and Education all had some positive impact as well.
+While most categories in the dataset have little to no impact on view rate, Education had the strongest positive impact, followed by People & Blogs. Nonprofits & Activism and Pets & Animals both had negative impact:
 
-![Category beeswarm](/images/category_beeswarm.png)
+![RF category beeswarm](/images/rf_category_beeswarm.png)
+
+### XGBoost
+
+The top features for the xgboost were subscribers, channel view count & the term "music":
+
+![XGB features](/images/xgb_top_feature_importance.png)
+
+The xgboost shows a similar positive trend in predictions for subscriber count as the random forest and negative trend for channel video count. It also seems to rely on channel view count for predictive power, where for the random forest most of that was absorbed by subscriber count:
+
+![XGB pdp channel stats](/images/xgb_pdp_channel_stats.png)
+
+Again differences in time of upload are small, but patterns that match with the random forest are that early and late in the day are the least performing times to upload and Monday & Tuesday are the best performing weekdays:
+
+![XGB pdp time stats](/images/xgb_pdp_time_stats.png)
+
+Published duration is showing the same downward pattern as it did in the random forest model and video duration, title length, description length, tag count and whether or not the video is a short all still have little affect on prediction:
+
+![XGB pdp misc variables](/images/xgb_pdp_misc_variables.png)
+
+The xgboost is still picking up on the same negative impact of the term "outreach" and positive impact of terms "instagram" and "gains". It is also picking up on a larger positive impact for the term "music":
+
+![XGB term beeswarm](/images/xgb_term_beeswarm.png)
 
 ## Further investigation [05_investigation_shap.ipynb](/05_investigation_shap.ipynb)
 
