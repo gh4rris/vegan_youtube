@@ -53,7 +53,7 @@ cd vegan_youtube
 pip install -r requirements.txt
 ```
 
-An API_KEY enviroment variable created using a Google account is required to run \_01_scraping.ipynb\_, however this isn't necessary as the data has already been scrapped and stored in the [/data](/data/) directory. The remainder of the notebooks can be run in order:
+An API_KEY enviroment variable created using a Google account is required to run [01_scraping.ipynb](/01_scraping.ipynb), however this isn't necessary as the data has already been scrapped and stored in the [/data](/data/) directory. The remainder of the notebooks can be run in order:
 
 - [02_wrangling_eda.ipynb](/02_wrangling_eda.ipynb)
 - [03_modeling_linreg.ipynb](/03_modeling_linreg.ipynb)
