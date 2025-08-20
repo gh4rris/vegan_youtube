@@ -126,8 +126,8 @@ First the mean absolute shap values for each feature were calculated and sorted 
 
 Since this process was done for both the random forest and xgboost individually, the results were then combined to calculate a mean effect size of features both models agreed were important. Any features were the models disagreed on the direction of the imporovement were filtered out, which left 11 top actionable terms.
 
-[Random Forest PDP for Top Actionable Features](/images/rf_pdp_actionable.png)
-[XGBoost PDP for Top Actionable Features](/images/xgb_pdp_actionable.png)
+- [Random Forest PDP for Top Actionable Features](/images/rf_pdp_actionable.png)
+- [XGBoost PDP for Top Actionable Features](/images/xgb_pdp_actionable.png)
 
 ![Random forest beeswarm](/images/rf_beeswarm_actionable.png)
 
