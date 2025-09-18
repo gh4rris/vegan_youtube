@@ -2,7 +2,7 @@
 
 ### Predicting Youtube engagement for vegan and animal rights based content
 
-This supervised learning project explores what makes vegan and animal rights based Youtube content successful in terms of engagement. Using the official Youtube API, machine learning models, and model interpretability tools, I investigate which features are associated with view rate (view count / number of days published) and what their relationship is.
+This supervised learning project explores what makes vegan and animal rights based Youtube content successful in terms of engagement. Using the official Youtube API, machine learning models, and model interpretability tools, I investigate which features are associated with view rate (view count / number of days published) and what their relationships are.
 
 The population of videos being analysed is videos with an animal rights based message and or made with the intent to encourage others to live vegan (the ethical principal that animals are entitled to rights). This can include cooking, lifestyle and health videos made with that intent. It can also include videos from non-vegan channels such as speeches, interviews and debates, so long as there is someone in these videos arguing for the ethical principal of veganism. Excluded are diet-challenge style videos focused on experimentation and personal experience, rather than advocacy.
 
